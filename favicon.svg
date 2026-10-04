@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#FF8A00"/><stop offset="1" stop-color="#F25C05"/></linearGradient></defs>
+  <rect width="512" height="512" rx="112" fill="url(#g)"/>
+  <g transform="translate(256 256) scale(1.0) translate(-256 -256)">
+    <path d="M64 384 H236 L262 340 L290 436 L322 280 L350 404 L368 384 H448" fill="none" stroke="#fff" stroke-width="22" stroke-linecap="round" stroke-linejoin="round"/>
+  <g transform="translate(256 196) scale(0.86) translate(-256 -256) rotate(-45 256 256) translate(13 0)">
+        <g fill="#fff">
+      <path d="M60 256 L136 251 V261 Z"/>
+      <rect x="130" y="242" width="34" height="28" rx="4"/>
+      <rect x="160" y="224" width="172" height="64" rx="10"/>
+      <rect x="328" y="196" width="16" height="120" rx="6"/>
+      <rect x="342" y="246" width="70" height="20"/>
+      <rect x="408" y="211" width="18" height="90" rx="7"/>
+    </g>
+    <g stroke="#F67A03" stroke-width="7" stroke-linecap="round">
+      <line x1="196" y1="224" x2="196" y2="252"/><line x1="232" y1="224" x2="232" y2="244"/>
+      <line x1="268" y1="224" x2="268" y2="252"/><line x1="304" y1="224" x2="304" y2="244"/>
+    </g>
+  </g>
+  </g>
+</svg>
