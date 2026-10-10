@@ -131,7 +131,12 @@
 
 <!-- ============ REGIONAL TAB ============ -->
 <section id="tab-regional" hidden>
-  <div id="regOut"></div>
+  <div class="card">
+    <h2 class="np">Spinal (intrathecal) – hyperbaric bupivacaine 0.5%</h2>
+    <label for="regWt" style="margin-top:.4rem">Weight (kg)</label>
+    <input id="regWt" type="number" inputmode="decimal" min="0.3" max="300" step="any" placeholder="e.g. 15">
+    <div id="regOut" style="margin-top:.6rem"></div>
+  </div>
 </section>
 
 <!-- ============ CASE TAB ============ -->
@@ -769,16 +774,20 @@ function bindConv(){
 // ---------- Regional: spinal hyperbaric bupivacaine 0.5% ----------
 // Weight brackets per pediatric prospective study (PMC; 102 children 6 mo–14 y, L4–L5): <5 kg 0.5, 5–15 kg 0.4, >15 kg 0.3 mg/kg
 function renderRegional(){
+  if(document.activeElement!==$('regWt')) $('regWt').value=$('wt').value;
   const w=W(); let body;
-  if(!ok(w)) body='<div class="big">Enter weight</div>';
+  if(!ok(w)) body='<div class="big" id="regEnter" style="cursor:pointer">Enter weight</div>';
   else {
     const [r,br] = w<5 ? [0.5,'< 5 kg'] : w<=15 ? [0.4,'5–15 kg'] : [0.3,'> 15 kg'];
     const mg=Math.round(r*w*10)/10, ml=Math.round(mg/5*100)/100;
     body=`<div class="big">${fmt(mg,1)} mg = ${fmt(ml,2)} mL</div><div class="note">${br}: ${r} mg/kg · Ref: hyperbaric bupivacaine 0.5%, pediatric 6 mo–14 y (PMC study)</div>`+
       (mode==='adult'?'<div class="note vwarn">Adult mode: formula is from a pediatric study (6 mo–14 y).</div>':'');
   }
-  $('regOut').innerHTML=`<div class="card"><h2 class="np">Spinal (intrathecal) – hyperbaric bupivacaine 0.5%</h2>${body}</div>`;
+  $('regOut').innerHTML=body;
 }
+// Regional weight mirrors the top weight field (same per-patient save path as bindField)
+$('regWt').addEventListener('input',()=>{ $('wt').value=$('regWt').value; P().f.wt=$('wt').value; saveP(); renderAll(); });
+$('regOut').addEventListener('click',e=>{ if(e.target.closest('#regEnter')) $('regWt').focus(); });
 
 // ---------- Case: patients, timer, log, notes ----------
 function renderPatSel(){ $('patSel').innerHTML = PS.list.map(p=>`<option value="${p.id}">${esc(p.label||'(unnamed)')}</option>`).join(''); $('patSel').value=PS.cur; }
