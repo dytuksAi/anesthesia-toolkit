@@ -93,7 +93,7 @@
 
 <div class="btnrow"><button id="emBtn" class="em">🚨 EMERGENCY – Crash cart</button></div>
 
-<div class="tabs" id="tabs"><button data-t="drugs">Drugs</button><button data-t="airway">Airway &amp; Blood</button><button data-t="case">Case</button></div>
+<div class="tabs" id="tabs"><button data-t="drugs">Drugs</button><button data-t="airway">Airway &amp; Blood</button><button data-t="regional">Regional</button><button data-t="case">Case</button></div>
 
 <!-- ============ DRUGS TAB ============ -->
 <section id="tab-drugs">
@@ -127,6 +127,11 @@
   </div>
   <div class="note">Weight is shared with the field at the top. Inputs are saved per patient (Case tab).</div>
   <div id="airOut"></div>
+</section>
+
+<!-- ============ REGIONAL TAB ============ -->
+<section id="tab-regional" hidden>
+  <div id="regOut"></div>
 </section>
 
 <!-- ============ CASE TAB ============ -->
@@ -445,7 +450,7 @@ document.querySelectorAll('#modeSeg button').forEach(b=>b.addEventListener('clic
 function setTab(t){
   tab=t; store.set('at_tab',t);
   document.querySelectorAll('#tabs button').forEach(b=>b.classList.toggle('on',b.dataset.t===t));
-  ['drugs','airway','case'].forEach(x=>$('tab-'+x).hidden = x!==t);
+  ['drugs','airway','regional','case'].forEach(x=>$('tab-'+x).hidden = x!==t);
   if(t==='case'){ renderLog(); tick(); }
 }
 document.querySelectorAll('#tabs button').forEach(b=>b.addEventListener('click',()=>setTab(b.dataset.t)));
@@ -761,6 +766,20 @@ function bindConv(){
   $('convId').addEventListener('input',upd); $('convFr').addEventListener('input',upd);
 }
 
+// ---------- Regional: spinal hyperbaric bupivacaine 0.5% ----------
+// Weight brackets per pediatric prospective study (PMC; 102 children 6 mo–14 y, L4–L5): <5 kg 0.5, 5–15 kg 0.4, >15 kg 0.3 mg/kg
+function renderRegional(){
+  const w=W(); let body;
+  if(!ok(w)) body='<div class="big">Enter weight</div>';
+  else {
+    const [r,br] = w<5 ? [0.5,'< 5 kg'] : w<=15 ? [0.4,'5–15 kg'] : [0.3,'> 15 kg'];
+    const mg=Math.round(r*w*10)/10, ml=Math.round(mg/5*100)/100;
+    body=`<div class="big">${fmt(mg,1)} mg = ${fmt(ml,2)} mL</div><div class="note">${br}: ${r} mg/kg · Ref: hyperbaric bupivacaine 0.5%, pediatric 6 mo–14 y (PMC study)</div>`+
+      (mode==='adult'?'<div class="note vwarn">Adult mode: formula is from a pediatric study (6 mo–14 y).</div>':'');
+  }
+  $('regOut').innerHTML=`<div class="card"><h2 class="np">Spinal (intrathecal) – hyperbaric bupivacaine 0.5%</h2>${body}</div>`;
+}
+
 // ---------- Case: patients, timer, log, notes ----------
 function renderPatSel(){ $('patSel').innerHTML = PS.list.map(p=>`<option value="${p.id}">${esc(p.label||'(unnamed)')}</option>`).join(''); $('patSel').value=PS.cur; }
 $('patSel').addEventListener('change',()=>{ PS.cur=$('patSel').value; saveP(); loadPatient(); toast('Switched to '+P().label); });
@@ -809,7 +828,7 @@ setInterval(()=>{ tick(); if(tab==='case') renderLog(); }, 1000);
 // keep other tabs synced if another browser tab edits storage
 window.addEventListener('storage',e=>{ if(e.key==='at_patients'){ PS=store.get('at_patients',PS); loadPatient(); } });
 
-function renderAll(){ render(); if(emergency) renderCrash(); renderAirway(); }
+function renderAll(){ render(); if(emergency) renderCrash(); renderAirway(); renderRegional(); }
 
 // ---------- Init ----------
 FIELDS.forEach(bindField);
