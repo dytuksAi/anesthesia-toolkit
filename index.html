@@ -80,6 +80,12 @@
   .soon{color:var(--warn);font-weight:700}
   #toast{position:fixed;left:50%;bottom:1.2rem;transform:translateX(-50%);background:#222;color:#fff;padding:.6rem 1rem;border-radius:10px;font-size:.9rem;opacity:0;transition:opacity .25s;pointer-events:none;max-width:90%}
   #toast.show{opacity:.95}
+  /* bupivacaine */
+  .tabs button{font-size:.95rem}
+  td.l,th.l{text-align:left}
+  .over{color:var(--red);font-weight:700}
+  .okc{color:var(--ok);font-weight:700}
+  .src{color:var(--muted);font-size:.75rem;margin-top:.8rem;line-height:1.35}
   [hidden]{display:none!important}
 </style>
 </head>
@@ -93,7 +99,7 @@
 
 <div class="btnrow"><button id="emBtn" class="em">🚨 EMERGENCY – Crash cart</button></div>
 
-<div class="tabs" id="tabs"><button data-t="drugs">Drugs</button><button data-t="airway">Airway &amp; Blood</button><button data-t="case">Case</button></div>
+<div class="tabs" id="tabs"><button data-t="drugs">Drugs</button><button data-t="airway">Airway &amp; Blood</button><button data-t="bupi">Bupivacaine</button><button data-t="case">Case</button></div>
 
 <!-- ============ DRUGS TAB ============ -->
 <section id="tab-drugs">
@@ -127,6 +133,16 @@
   </div>
   <div class="note">Weight is shared with the field at the top. Inputs are saved per patient (Case tab).</div>
   <div id="airOut"></div>
+</section>
+
+<!-- ============ BUPIVACAINE TAB ============ -->
+<section id="tab-bupi" hidden>
+  <div class="grid2">
+    <div><label for="bAge">Age</label><input id="bAge" type="number" inputmode="decimal" min="0" step="any" placeholder="e.g. 3"></div>
+    <div><label for="bAgeUnit">Age unit</label><select id="bAgeUnit"><option value="y">years</option><option value="mo">months</option></select></div>
+  </div>
+  <div class="note">Weight is the field at the top. Age is shared with the Airway tab and saved per patient.</div>
+  <div id="bupiOut"></div>
 </section>
 
 <!-- ============ CASE TAB ============ -->
@@ -374,9 +390,9 @@ const DRUGS = {
       {label:"Max local, plain", type:"bolus", lo:4.5, hi:4.5, unit:"mg/kg", max:300, conc:20, note:"Same mg/kg as adults; reduce ~30% in infants < 6 months."},
       {label:"Max local, with epinephrine", type:"bolus", lo:7, hi:7, unit:"mg/kg", max:500, conc:20}]},
     "Bupivacaine": {conc:"5 mg/mL (0.5%)", doses:[
-      {label:"Max local dose", type:"bolus", lo:2.5, hi:2.5, unit:"mg/kg", max:175, conc:5, note:"With epinephrine up to 3 mg/kg (max 225 mg)."}],
+      {label:"Max local dose", type:"bolus", lo:2.5, hi:2.5, unit:"mg/kg", max:175, conc:5, note:"With epinephrine up to 3 mg/kg (max 225 mg). Full calculator: Bupivacaine tab."}],
      peds:[
-      {label:"Max local dose", type:"bolus", lo:2.5, hi:2.5, unit:"mg/kg", max:175, concs:[{c:5,l:"0.5%"},{c:2.5,l:"0.25%"}], note:"Same mg/kg as adults; reduce ~30% (≈ 2 mg/kg) in neonates/infants < 6 months."},
+      {label:"Max local dose", type:"bolus", lo:2.5, hi:2.5, unit:"mg/kg", max:175, concs:[{c:5,l:"0.5%"},{c:2.5,l:"0.25%"}], note:"Reduce ~30% (≈ 1.75 mg/kg) in neonates/infants < 6 months. Full calculator: Bupivacaine tab."},
       {label:"Caudal (0.25%, Armitage)", type:"custom", fn:w=> ok(w) ? {main:range(0.5*w,1*w,'mL')+' of 0.25%', lines:[`= ${range(1.25*w,2.5*w,'mg')}`, '0.5 mL/kg sacral · 1 mL/kg lumbar; stay ≤ 2.5 mg/kg']} : {main:'Enter weight', lines:['0.5 – 1 mL/kg of 0.25%']}}]},
     "Ondansetron": {conc:"2 mg/mL", doses:[
       {label:"PONV", type:"bolus", lo:0.1, hi:0.1, unit:"mg/kg", max:4, conc:2}],
@@ -445,7 +461,7 @@ document.querySelectorAll('#modeSeg button').forEach(b=>b.addEventListener('clic
 function setTab(t){
   tab=t; store.set('at_tab',t);
   document.querySelectorAll('#tabs button').forEach(b=>b.classList.toggle('on',b.dataset.t===t));
-  ['drugs','airway','case'].forEach(x=>$('tab-'+x).hidden = x!==t);
+  ['drugs','airway','bupi','case'].forEach(x=>$('tab-'+x).hidden = x!==t);
   if(t==='case'){ renderLog(); tick(); }
 }
 document.querySelectorAll('#tabs button').forEach(b=>b.addEventListener('click',()=>setTab(b.dataset.t)));
@@ -761,6 +777,108 @@ function bindConv(){
   $('convId').addEventListener('input',upd); $('convFr').addEventListener('input',upd);
 }
 
+// ---------- Bupivacaine calculator ----------
+// Sources (see on-screen note):
+//  Adult max 2.5 mg/kg (175 mg) plain, 3 mg/kg (225 mg) with epi 1:200,000; ≤ 400 mg/24 h – bupivacaine/Marcaine US label (Pfizer 2023).
+//  Pediatric single shot 2.5 mg/kg, plain or with epi – ESRA/ASRA pediatric LA dosing advisory (Suresh, RAPM 2018) & Berde (J Pediatr 1993) as tabulated in Coté/Smith.
+//  Neonates & infants < 6 mo: ~30% reduction (2.5 × 0.7 = 1.75 mg/kg) – conservative; some references allow 2–2.5 mg/kg, others 1.5 mg/kg in neonates.
+//  Caudal volumes (Armitage): 0.5 / 1.0 / 1.25 mL/kg, ESRA/ASRA (0.25%, not to exceed 2.5 mg/kg).
+//  Spinal hyperbaric 0.5%: adult 10–20 mg (UK SmPC, Bupivacaine 0.5% with glucose); peds SmPC <5 kg 0.4–0.5, 5–15 kg 0.3–0.4, 15–40 kg 0.25–0.3 mg/kg vs ESRA/ASRA 1 / 0.4 / 0.3 mg/kg.
+//  Epidural infusion max: ESRA/ASRA 0.2 (<3 mo) / 0.3 (3–12 mo) / 0.4 (>1 y) mg/kg/h; Berde 0.2 (<6 mo) / 0.4 (child) – lower value used per age band.
+//  LAST: ASRA 2020 checklist (lipid() above).
+const BUPI = {
+  neonate:{name:'Neonate (< 1 month)', plain:1.75, epi:1.75, inf:0.2, red:true},
+  infYoung:{name:'Infant 1–6 months', plain:1.75, epi:1.75, inf:0.2, red:true},
+  infOld:{name:'Infant 6–12 months', plain:2.5, epi:2.5, inf:0.3},
+  child:{name:'Child', plain:2.5, epi:2.5, inf:0.4},
+  adult:{name:'Adult', plain:2.5, epi:3}
+};
+const BCAP = {plain:175, epi:225};   // absolute single-dose caps (label)
+const BCONC = [0.125,0.25,0.375,0.5,0.75];
+const fl1 = x => Math.floor(x*10+1e-9)/10;   // max volumes: round DOWN to 0.1 mL
+function bupiGroup(){
+  const y=ageYears(), g=ageGroup(y);
+  if(g==null) return {k:'child', unknown:true};
+  if(g==='preterm'||g==='neonate') return {k:'neonate', preterm:g==='preterm'};
+  if(g==='infant') return {k: y<0.5 ? 'infYoung' : 'infOld'};
+  return {k:g};
+}
+function bupiMax(G,w){
+  const p=G.plain*w, e=G.epi*w;
+  return {plain:Math.min(p,BCAP.plain), epi:Math.min(e,BCAP.epi), capP:p>BCAP.plain, capE:e>BCAP.epi};
+}
+function bupiSpinalPeds(w){
+  if(w<5)  return {lo:0.4, hi:1,   lbl:'0.4–0.5', esra:'1',   band:'< 5 kg'};
+  if(w<=15) return {lo:0.3, hi:0.4, lbl:'0.3–0.4', esra:'0.4', band:'5–15 kg'};
+  return        {lo:0.25,hi:0.3, lbl:'0.25–0.3',esra:'0.3', band:'15–40 kg'};
+}
+function renderBupi(){
+  // keep the age fields in sync with the Airway tab
+  if(document.activeElement!==$('bAge')) $('bAge').value=$('age').value;
+  $('bAgeUnit').value=$('ageUnit').value;
+  const w=W(), good=ok(w), bg=bupiGroup(), G=BUPI[bg.k], adult=bg.k==='adult';
+  let h='';
+  // Group
+  h+=`<div class="card"><h2 class="np">Group</h2><div class="big">${G.name}${bg.preterm?' (preterm)':''}</div>`+
+     (bg.unknown?`<div class="vwarn" style="margin-top:.3rem">Pediatric mode with no age: child limits shown. Enter age – under 6 months uses the reduced dose.</div>`:'')+
+     ($('age').value===''&&adult?'<div class="note">Age not entered – assuming adult.</div>':'')+
+     (!good?'<div class="vwarn" style="margin-top:.3rem">Enter weight at the top for mg / mL values.</div>':'')+`</div>`;
+  // 1. Max safe dose
+  const m = good ? bupiMax(G,w) : null;
+  h+=`<div class="card"><h2 class="np">Maximum single dose</h2>`+
+    (good?`<div class="big">Plain ${fmt(m.plain)} mg · With epi ${fmt(m.epi)} mg</div>`:`<div class="big">Plain ${fmt(G.plain)} · with epi ${fmt(G.epi)} mg/kg</div>`)+
+    `<div class="note">Plain ${fmt(G.plain)} mg/kg (max ${BCAP.plain} mg)${good?` = ${fmt(G.plain*w)} mg${m.capP?' → capped':''}`:''}</div>`+
+    `<div class="note">With epinephrine 1:200,000: ${fmt(G.epi)} mg/kg (max ${BCAP.epi} mg)${good?` = ${fmt(G.epi*w)} mg${m.capE?' → capped':''}`:''}</div>`+
+    (G.red?`<div class="note vwarn">Reduced ~30% for neonates / infants &lt; 6 months (2.5 → 1.75 mg/kg): lower α1-acid glycoprotein, slower clearance.</div>`:'')+
+    (!adult?`<div class="note">Children: epinephrine does not raise the limit (conservative: 2.5 mg/kg plain or with epi).</div>`:`<div class="note">Repeat no sooner than q3 h; total ≤ 400 mg / 24 h (label). Reduce in elderly, debilitated, hepatic or cardiac disease.</div>`)+
+    `<div class="note">Doses of different local anesthetics are additive (e.g. lidocaine in the same case).</div></div>`;
+  // 2. Volume table
+  const concs = adult ? BCONC : BCONC.filter(c=>c<0.75);
+  const rows = concs.map(c=>{ const mgml=c*10;
+    return `<tr><td>${c}%${c===0.75?'*':''}</td><td>${fmt(mgml)}</td><td>${good?fmt(fl1(m.plain/mgml),1):'–'}</td><td>${good?fmt(fl1(m.epi/mgml),1):'–'}</td></tr>`; }).join('');
+  h+=`<div class="card"><h2 class="np">Maximum volume by concentration</h2>
+    <table><thead><tr><th>Conc.</th><th>mg/mL</th><th>Max mL plain</th><th>Max mL + epi</th></tr></thead><tbody>${rows}</tbody></table>
+    <div class="note">mg/mL = % × 10 (0.5% = 5 mg/mL). Max volumes rounded down to 0.1 mL.</div>`+
+    (adult?`<div class="note">* 0.75%: adults only; not for obstetric anesthesia (label).</div>`:`<div class="note">0.75% omitted: not used in children.</div>`)+`</div>`;
+  // 3a. Caudal (pediatric)
+  if(!adult){
+    const lv=[['Sacral',0.5],['Lumbar',1.0],['Mid-thoracic',1.25]];
+    const crow = lv.map(([n,v])=>{ const mgkg=v*2.5, over=mgkg>G.plain+1e-9, maxPct=G.plain/v/10;
+      return `<tr><td class="l">${n}</td><td>${v}</td><td>${good?fmt(v*w,1):'–'}</td><td>${fmt(mgkg,2)}${good?`<br><span class="note">${fmt(mgkg*w)} mg</span>`:''}</td><td>${over?`<span class="over">⚠ &gt; max</span><br><span class="note">use ≤ ${fmt(Math.floor(maxPct*1000)/1000,3)}%</span>`:'<span class="okc">✓</span>'}</td></tr>`; }).join('');
+    h+=`<div class="card"><h2 class="np">Caudal – 0.25% (Armitage volumes)</h2>
+      <table><thead><tr><th class="l">Level</th><th>mL/kg</th><th>mL</th><th>mg/kg</th><th>vs max</th></tr></thead><tbody>${crow}</tbody></table>
+      <div class="note">Limit ${fmt(G.plain)} mg/kg for this group. 1.25 mL/kg of 0.25% = 3.1 mg/kg – always exceeds the limit, so dilute (shown) or use less volume.</div></div>`;
+  }
+  // 3b. Spinal 0.5% hyperbaric
+  let sp;
+  if(adult) sp=`<div class="big">10 – 20 mg = 2 – 4 mL</div><div class="note">0.5% hyperbaric (5 mg/mL), label range. Reduce in elderly and late pregnancy.</div><div class="note">US 0.75% heavy label for comparison: 7.5 mg perineal/lower limb, 12 mg lower abdomen, 7.5–10.5 mg cesarean.</div>`;
+  else if(!good) sp=`<div class="big">Enter weight</div><div class="note">&lt; 5 kg 0.4–1 · 5–15 kg 0.3–0.4 · 15–40 kg 0.25–0.3 mg/kg</div>`;
+  else if(w>40) sp=`<div class="big">&gt; 40 kg: use adult dosing</div><div class="note">Adult label 10 – 20 mg (2 – 4 mL of 0.5%).</div>`;
+  else { const s=bupiSpinalPeds(w);
+    sp=`<div class="big">${range(s.lo*w,s.hi*w,'mg')}</div><div class="note">= ${range(s.lo*w/5,s.hi*w/5,'mL')} of 0.5% (5 mg/mL) – use a 1 mL syringe</div>`+
+       `<div class="note">${s.band}: label ${s.lbl} mg/kg · ESRA/ASRA ${s.esra} mg/kg. Start low; higher end if needed for a reliable block.</div>`+
+       `<div class="note">Infants need more per kg (larger CSF volume) and blocks last shorter (~60–90 min).</div>`; }
+  h+=`<div class="card"><h2 class="np">Spinal – 0.5% hyperbaric (heavy)</h2>${sp}</div>`;
+  // 3c. Infusion
+  let inf;
+  if(adult) inf=`<div class="big">≤ 400 mg / 24 h total</div><div class="note">Label limit for all bupivacaine (boluses + infusion). Common epidural solutions 0.0625–0.125%.</div>`;
+  else { const r=G.inf;
+    inf=`<div class="big">≤ ${fmt(r)} mg/kg/h${good?` = ${fmt(r*w,2)} mg/h`:''}</div>`+
+      (good?`<div class="note">= ${fmt(r*w/1.25,2)} mL/h of 0.125% · ${fmt(r*w/1,2)} mL/h of 0.1%</div>`:'')+
+      `<div class="note">Neonates &amp; infants &lt; 6 mo: 0.2 · 6–12 mo: 0.3 · &gt; 1 y: 0.4 mg/kg/h</div>`+
+      (G.red?`<div class="note vwarn">Young infants accumulate bupivacaine: consider limiting infusions to ~36–48 h.</div>`:'')+
+      `<div class="note">ESRA/ASRA: 0.2 (&lt; 3 mo), 0.3 (3–12 mo), 0.4 (&gt; 1 y). Older limits (Berde): 0.2 (&lt; 6 mo), 0.4 (child). The lower value is used for each age.</div>`; }
+  h+=`<div class="card"><h2 class="np">Continuous infusion limit</h2>${inf}</div>`;
+  // 4. LAST
+  const L=lipid(good?w:null);
+  h+=`<div class="card crash"><h2 class="np">LAST – 20% lipid emulsion</h2><div class="big">${L.main}</div>${L.lines.map(l=>`<div class="note">${l}</div>`).join('')}`+
+     `<div class="note">Stop injecting · call for help · airway with 100% O₂ · benzodiazepine for seizures · epinephrine ≤ 1 mcg/kg · avoid vasopressin, Ca-channel blockers, β-blockers, local anesthetics.</div></div>`;
+  h+=`<div class="src"><b>Sources:</b> Bupivacaine / Marcaine US label (Pfizer, 2023) – adult maxima, 400 mg/24 h, 0.75% restrictions; Bupivacaine 0.5% with glucose UK SmPC – spinal doses; ESRA/ASRA pediatric local anesthetic dosing advisory (Suresh et al., RAPM 2018) – 2.5 mg/kg, Armitage caudal, infant spinal, infusion rates; Berde 1993 (as tabulated in Coté/Smith pediatric texts) – 30% reduction &lt; 6 mo and infusion limits; ASRA LAST checklist 2020. Where sources differ, the lower value is used. Reference aid only.</div>`;
+  $('bupiOut').innerHTML=h;
+}
+$('bAge').addEventListener('input',()=>{ $('age').value=$('bAge').value; P().f.age=$('bAge').value; saveP(); renderAll(); });
+$('bAgeUnit').addEventListener('change',()=>{ $('ageUnit').value=$('bAgeUnit').value; P().f.ageUnit=$('bAgeUnit').value; saveP(); renderAll(); });
+
 // ---------- Case: patients, timer, log, notes ----------
 function renderPatSel(){ $('patSel').innerHTML = PS.list.map(p=>`<option value="${p.id}">${esc(p.label||'(unnamed)')}</option>`).join(''); $('patSel').value=PS.cur; }
 $('patSel').addEventListener('change',()=>{ PS.cur=$('patSel').value; saveP(); loadPatient(); toast('Switched to '+P().label); });
@@ -809,7 +927,7 @@ setInterval(()=>{ tick(); if(tab==='case') renderLog(); }, 1000);
 // keep other tabs synced if another browser tab edits storage
 window.addEventListener('storage',e=>{ if(e.key==='at_patients'){ PS=store.get('at_patients',PS); loadPatient(); } });
 
-function renderAll(){ render(); if(emergency) renderCrash(); renderAirway(); }
+function renderAll(){ render(); if(emergency) renderCrash(); renderAirway(); renderBupi(); }
 
 // ---------- Init ----------
 FIELDS.forEach(bindField);
